@@ -102,8 +102,7 @@
             $conn.Close()
             $conn.Dispose()
 
-            $null = Get-CloudService -ID $Resource.CloudServiceId |
-            Set-CloudService -RunREST
+            $null = Get-CloudService -ID $Resource.CloudServiceId | Set-CloudService -RunREST
         } -PSComputerName $ActiveNode -PSCredential $VMMCreds -PSRequiredModules VirtualMachineManager -PSAuthentication CredSSP
     }
     catch {
