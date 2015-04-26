@@ -1,4 +1,4 @@
-﻿workflow Get-VMKVPValue {
+﻿workflow Wait-VMKVPValue {
     [OutputType([PSCustomObject])]
 
     param (
@@ -30,6 +30,7 @@
 
     try {
         $Result = inlinescript {
+            $ErrorActionPreference = 'Stop'
             $VerbosePreference = [System.Management.Automation.ActionPreference]$Using:VerbosePreference
             $DebugPreference = [System.Management.Automation.ActionPreference]$Using:DebugPreference 
 
