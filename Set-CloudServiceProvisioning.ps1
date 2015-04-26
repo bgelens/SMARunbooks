@@ -1,5 +1,5 @@
 ﻿workflow Set-CloudServiceProvisioning {
-    [OutputType([psobject])]
+    [OutputType([PSCustomObject])]
 
     param (
         [Parameter(Mandatory)]
@@ -16,7 +16,7 @@
         [bool] $Enable
     )
 
-    $OutputObj = [psobject] @{}
+    $OutputObj = [PSCustomObject] @{}
 
     $ErrorActionPreference = 'Stop'
     Write-Verbose -Message 'Running Runbook: Set-CloudServiceProvisioning'
@@ -24,15 +24,15 @@
     Write-Verbose -Message "VMMServer: $VMMServer"
     Write-Verbose -Message "VMMCreds: $($VMMCreds.UserName)"
 
-    if ($Enable -eq $false) {
-        if (-not $ServiceInstanceId) {
-            throw 'ServiceInstanceId not present, cannot update table to provisioned state'
-        }
-        Add-Member -InputObject $OutputObj -MemberType NoteProperty -Name 'ServiceInstanceId' -Value $ServiceInstanceId
-    }
-    Add-Member -InputObject $OutputObj -MemberType NoteProperty -Name 'VMRoleID' -Value $VMRoleID
-
     try {
+        if ($Enable -eq $false) {
+            if (-not $ServiceInstanceId) {
+                throw 'ServiceInstanceId not present, cannot update table to provisioned state'
+            }
+            Add-Member -InputObject $OutputObj -MemberType NoteProperty -Name 'ServiceInstanceId' -Value $ServiceInstanceId
+        }
+        Add-Member -InputObject $OutputObj -MemberType NoteProperty -Name 'VMRoleID' -Value $VMRoleID
+
         Write-Verbose -Message 'Checking if VMM is clustered'
         $ActiveNode = inlinescript {
             $ErrorActionPreference = 'Stop'
@@ -105,7 +105,6 @@
             $null = Get-CloudService -ID $Resource.CloudServiceId |
             Set-CloudService -RunREST
         } -PSComputerName $ActiveNode -PSCredential $VMMCreds -PSRequiredModules VirtualMachineManager -PSAuthentication CredSSP
-        return $Result
     }
     catch {
         Add-Member -InputObject $OutputObj -MemberType NoteProperty -Name 'error' -Value $_.message
