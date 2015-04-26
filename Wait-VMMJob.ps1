@@ -2,8 +2,6 @@
     [OutputType([PSCustomObject])]
 
     param (
-        [Int]$SleepDuration = 5,
-
         [Parameter(Mandatory)]
         [String]$VMMJobId,
 
@@ -21,7 +19,6 @@
     Write-Verbose -Message "VMMJobId: $VMMJobId"
     Write-Verbose -Message "VMMServer: $VMMServer"
     Write-Verbose -Message "VMMCreds: $($VMMCreds.UserName)"
-    Write-Verbose -Message "SleepDuration: $SleepDuration"
 
     try {
         $Result = InlineScript {
@@ -34,10 +31,11 @@
 
             Write-Verbose -Message 'Start Monitoring VMM Job'
             while ((Get-SCJob -ID $using:VMMJobId).Status -eq 'Running') {
-                Write-Debug -Message "Waiting for job to stop Running, sleeping for $($using:SleepDuration)"
-                Start-Sleep -Seconds $using:SleepDuration
+                Write-Debug -Message 'Waiting for job to stop Running, sleeping for 3 seconds'
+                Start-Sleep -Seconds 3
             }
-            return (Get-SCJob -ID $using:VMMJobId).StatusString
+            $status = [String](Get-SCJob -ID $using:VMMJobId).Status
+            return $status
         } -PSComputerName $VMMServer -PSCredential $VMMCreds -PSRequiredModules VirtualMachineManager
         Add-Member -InputObject $OutputObj -MemberType NoteProperty -Name 'Status' -Value $Result
     }

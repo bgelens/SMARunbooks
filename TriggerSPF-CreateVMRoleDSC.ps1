@@ -13,14 +13,18 @@
     $VMMCreds = Get-AutomationPSCredential -Name 'SCVMM Service Account'
     $VMMServer = Get-AutomationVariable -Name 'VMMServer'
     
+    
     $VMRoleVMs = Get-VMRoleVMs -VMRoleId $ResourceObject.id -VMMCreds $VMMCreds -VMMServer $VMMServer
     if ($VMRoleVMs.error) {
         #terminating exception
         Write-Error -Message "Error occured while running Get-VMRoleVMs runbook $($VMRoleVMs.error)" -ErrorAction Continue
         return
     }
+    Write-Output -InputObject $VMRoleVMs
 
     $WaitJob = Wait-VMMJob -VMMJobId $VMMJobId -VMMServer $VMMServer -VMMCreds $VMMCreds
+
+    Write-Output -InputObject $WaitJob
     if ($WaitJob.error) {
         #terminating exception
         Write-Error -Message "Error occured while running Wait-VMMJob runbook $($WaitJob.error)" -ErrorAction Continue
@@ -38,6 +42,8 @@
                                                        -VMMCreds $VMMCreds `
                                                        -Enable $true
     
+    Write-Output -InputObject $ProvisioningEnable
+
     if ($ProvisioningEnable.error) {
         #terminating exception
         Write-Error -Message "Error occured while running Set-CloudServiceProvisioning runbook $($ProvisioningEnable.error)" -ErrorAction Continue
@@ -49,6 +55,7 @@
         if ($KVP.error) {
             Write-Error -Message "Error occured while running Wait-VMKVPValue runbook for $VM.name - $($KVP.error)" -ErrorAction Continue
         }
+        Write-Output -InputObject $KVP
     }
 
     $ProvisioningDisable = Set-CloudServiceProvisioning -VMRoleID $ResourceObject.id `
@@ -56,6 +63,8 @@
                                                         -VMMCreds $VMMCreds `
                                                         -Enable $false `
                                                         -ServiceInstanceId $ProvisioningEnable.ServiceInstanceId
+    
+    Write-Output -InputObject $ProvisioningDisable
 
     if ($ProvisioningDisable.error) {
         #terminating exception
