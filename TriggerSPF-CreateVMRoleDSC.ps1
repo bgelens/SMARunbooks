@@ -1,10 +1,11 @@
 ﻿workflow TriggerSPF-CreateVMRoleDSC {
+
     param (
         [Parameter(Mandatory=$true)]
-        [PSObject]$ResourceObject,
+        [Object]$ResourceObject,
 
         [Parameter(Mandatory=$true)]
-        [PSObject]$Params,
+        [Object]$Params,
 
         [Parameter(Mandatory=$true)]
         [String]$VMMJobId
@@ -37,10 +38,16 @@
         return
     }
 
-    $ProvisioningEnable = Set-CloudServiceProvisioning -VMRoleID $ResourceObject.id `
-                                                       -VMMServer $VMMServer `
-                                                       -VMMCreds $VMMCreds `
-                                                       -Enable $true
+    SendMail -Body '<h1>Time to check on WAPack!</h1>' `
+             -Subject 'SMA Update - Enabling Provisioning Status in 120 seconds' `
+             -To 'ben.gelens@inovativ.nl'
+
+    Start-Sleep -Seconds 120
+
+    $ProvisioningEnable = Set-CloudServiceStatus -VMRoleID $ResourceObject.id `
+                                                 -VMMServer $VMMServer `
+                                                 -VMMCreds $VMMCreds `
+                                                 -Provisioning $true
     
     Write-Output -InputObject $ProvisioningEnable
 
@@ -58,11 +65,19 @@
         Write-Output -InputObject $KVP
     }
 
-    $ProvisioningDisable = Set-CloudServiceProvisioning -VMRoleID $ResourceObject.id `
-                                                        -VMMServer $VMMServer `
-                                                        -VMMCreds $VMMCreds `
-                                                        -Enable $false `
-                                                        -ServiceInstanceId $ProvisioningEnable.ServiceInstanceId
+    SendMail -Body "<h1>Time to check on WAPack!</h1><br>
+                    Key: $KVP.Key<br>
+                    Value: $KVP.Value" `
+             -Subject 'SMA Update - Disabling Provisioning Status in 120 seconds' `
+             -To 'ben.gelens@inovativ.nl'
+
+    Start-Sleep -Seconds 120
+
+    $ProvisioningDisable = Set-CloudServiceStatus -VMRoleID $ResourceObject.id `
+                                                  -VMMServer $VMMServer `
+                                                  -VMMCreds $VMMCreds `
+                                                  -Provisioned $true `
+                                                  -ServiceInstanceId $ProvisioningEnable.ServiceInstanceId
     
     Write-Output -InputObject $ProvisioningDisable
 

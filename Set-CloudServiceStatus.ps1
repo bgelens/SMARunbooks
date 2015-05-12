@@ -1,7 +1,8 @@
-﻿workflow Set-CloudServiceProvisioning {
+﻿workflow Set-CloudServiceStatus {
+
     [OutputType([PSCustomObject])]
 
-    param (
+   param (
         [Parameter(Mandatory)]
         [string] $VMRoleID,
 
@@ -13,46 +14,78 @@
 
         [string] $ServiceInstanceId,
 
-        [bool] $Enable
+        [bool] $Provisioning,
+
+        [bool] $Provisioned
     )
 
     $OutputObj = [PSCustomObject] @{}
 
     $ErrorActionPreference = 'Stop'
-    Write-Verbose -Message 'Running Runbook: Set-CloudServiceProvisioning'
+    Write-Verbose -Message 'Running Runbook: Set-CloudServiceStatus'
     Write-Verbose -Message "VMRoleID: $VMRoleID"
     Write-Verbose -Message "VMMServer: $VMMServer"
     Write-Verbose -Message "VMMCreds: $($VMMCreds.UserName)"
+    Write-Verbose -Message "Provisioning: $Provisioning"
+    Write-Verbose -Message "Provisioned: $Provisioned"
+    if ($ServiceInstanceId) {
+        Write-Verbose -Message "ServiceInstanceId: $ServiceInstanceId"
+    }
 
     try {
-        if ($Enable -eq $false) {
+        if ($Provisioned -and $Provisioning) {
+            Write-Error -Message 'Cannot state Provisioned and Provisioning at the same time' -ErrorAction Continue
+            throw 'Cannot state Provisioned and Provisioning at the same time'
+        }
+
+        if ($Provisioned) {
             if (-not $ServiceInstanceId) {
+                Write-Error -Message 'ServiceInstanceId not present, cannot update table to provisioned state' -ErrorAction Continue
                 throw 'ServiceInstanceId not present, cannot update table to provisioned state'
             }
-            Add-Member -InputObject $OutputObj -MemberType NoteProperty -Name 'ServiceInstanceId' -Value $ServiceInstanceId
         }
         Add-Member -InputObject $OutputObj -MemberType NoteProperty -Name 'VMRoleID' -Value $VMRoleID
 
         Write-Verbose -Message 'Checking if VMM is clustered'
-        $ActiveNode = inlinescript {
+        [PSCustomObject]$ActiveNode = inlinescript {
             $ErrorActionPreference = 'Stop'
             $VerbosePreference = [System.Management.Automation.ActionPreference]$Using:VerbosePreference
             $DebugPreference = [System.Management.Automation.ActionPreference]$Using:DebugPreference 
+
+            $InlineObj = [PSCustomObject]@{}
+
+            Add-Member -InputObject $InlineObj -MemberType NoteProperty -Name 'ProcessId' -Value $PID -Force
+            Add-Member -InputObject $InlineObj -MemberType NoteProperty -Name 'HostName' -Value "$env:COMPUTERNAME.$env:USERDNSDOMAIN" -Force
+
             Write-Verbose -Message 'Loading VMM Environmental data'
             $VMM = Get-SCVMMServer -ComputerName $Using:VMMServer
+
+            Write-Verbose -Message 'Checking if VMM is deployed in HA'
             if ($VMM.IsHighlyAvailable) {
-                return $VMM.ActiveVMMNode
+                Write-Debug -Message 'VMM is in HA, returning Active Node'
+                Add-Member -InputObject $InlineObj -MemberType NoteProperty -Name 'VMMServer' -Value $VMM.ActiveVMMNode -Force
             }
             else {
-                return $using:VMMServer
+                Write-Debug -Message 'VMM is not in HA, returning current Node'
+                Add-Member -InputObject $InlineObj -MemberType NoteProperty -Name 'VMMServer' -Value $using:VMMServer -Force
             }
+
+            return $InlineObj
         } -PSComputerName $VMMServer -PSCredential $VMMCreds -PSRequiredModules VirtualMachineManager
 
+        if ($ActiveNode.ProcessId) {
+            Stop-LingeringSession -ProcessId $ActiveNode.ProcessId -Server $ActiveNode.HostName -Credential $VMMCreds
+        }
+
         Write-Verbose -Message 'Configuring CloudService provisioning status'
-        $Result = inlinescript {
+        [PSCustomObject]$ResultObj = inlinescript {
+            $VerbosePreference=[System.Management.Automation.ActionPreference]$Using:VerbosePreference
+            $DebugPreference=[System.Management.Automation.ActionPreference]$Using:DebugPreference
             $ErrorActionPreference = 'Stop'
-            $VerbosePreference = [System.Management.Automation.ActionPreference]$Using:VerbosePreference
-            $DebugPreference = [System.Management.Automation.ActionPreference]$Using:DebugPreference 
+            $InlineObj = [PSCustomObject]@{}
+
+            Add-Member -InputObject $InlineObj -MemberType NoteProperty -Name 'ProcessId' -Value $PID -Force
+            Add-Member -InputObject $InlineObj -MemberType NoteProperty -Name 'HostName' -Value "$env:COMPUTERNAME.$env:USERDNSDOMAIN" -Force
 
             Write-Verbose -Message 'Loading VMM Environmental data'
             $VMMConn = Get-SCVMMServer -ComputerName $Using:VMMServer
@@ -66,7 +99,7 @@
             $conn.ConnectionString = $ConnectionString
             $conn.Open()
 
-            if ($using:Enable) {
+            if ($using:Provisioning) {
                 Write-Verbose -Message 'Enable Provisioning status'
                 $TSQL = @"
                 update dbo.tbl_WLC_ServiceInstance
@@ -81,36 +114,42 @@
                 while ($reader.Read()) {
                     $output = $reader.GetValue($1)
                 }
-                Write-Output -InputObject $output.GUID
+                Add-Member -InputObject $InlineObj -MemberType NoteProperty -Name 'ServiceInstanceId' -Value $output.GUID -Force
             }
 
-            else {
+            elseif ($using:Provisioned) {
                 Write-Verbose -Message 'Disable Provisioning status'
                 $TSQL = @"
-            update dbo.tbl_WLC_ServiceInstance
-            Set ObjectState = 1, VMRoleID = '$using:VMRoleID'
-            where ServiceInstanceId = '$using:ServiceInstanceId'
+                update dbo.tbl_WLC_ServiceInstance
+                Set ObjectState = 1, VMRoleID = '$using:VMRoleID'
+                where ServiceInstanceId = '$using:ServiceInstanceId'
 "@
-
-
                 $command = New-Object -TypeName System.Data.SqlClient.SqlCommand
                 $command.Connection = $conn
                 $command.CommandText = $TSQL
                 $null = $command.ExecuteNonQuery()
+
+                Add-Member -InputObject $InlineObj -MemberType NoteProperty -Name 'ServiceInstanceId' -Value $using:ServiceInstanceId
             }
+
+            #elseif ($using:Failed) {} ?
            
             $conn.Close()
             $conn.Dispose()
 
             $null = Get-CloudService -ID $Resource.CloudServiceId | Set-CloudService -RunREST
-        } -PSComputerName $ActiveNode -PSCredential $VMMCreds -PSRequiredModules VirtualMachineManager -PSAuthentication CredSSP
+            return $InlineObj
+        } -PSComputerName $ActiveNode.VMMServer -PSCredential $VMMCreds -PSRequiredModules VirtualMachineManager -PSAuthentication CredSSP
     }
     catch {
         Add-Member -InputObject $OutputObj -MemberType NoteProperty -Name 'error' -Value $_.message
     }
 
-    if ($Enable) {
-        Add-Member -InputObject $OutputObj -MemberType NoteProperty -Name 'ServiceInstanceId' -Value $Result
+    Add-Member -InputObject $OutputObj -MemberType NoteProperty -Name 'ServiceInstanceId' -Value $ResultObj.ServiceInstanceId -Force
+
+    if ($ResultObj.ProcessId) {
+        Stop-LingeringSession -ProcessId $ResultObj.ProcessId -Server $ResultObj.Hostname -Credential $VMMCreds
     }
+
     return $OutputObj
 }
