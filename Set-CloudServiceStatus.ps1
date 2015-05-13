@@ -2,7 +2,7 @@
 
     [OutputType([PSCustomObject])]
 
-   param (
+    param (
         [Parameter(Mandatory)]
         [string] $VMRoleID,
 
@@ -21,7 +21,6 @@
 
     $OutputObj = [PSCustomObject] @{}
 
-    $ErrorActionPreference = 'Stop'
     Write-Verbose -Message 'Running Runbook: Set-CloudServiceStatus'
     Write-Verbose -Message "VMRoleID: $VMRoleID"
     Write-Verbose -Message "VMMServer: $VMMServer"

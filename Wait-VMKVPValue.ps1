@@ -1,4 +1,5 @@
 ﻿workflow Wait-VMKVPValue {
+
     [OutputType([PSCustomObject])]
 
     param (
@@ -14,13 +15,11 @@
         [Parameter(Mandatory)]
         [String] $Key,
 
-        [Parameter(Mandatory)]
         [String] $Value
     )
 
     $OutputObj = [PSCustomObject] @{}
 
-    $ErrorActionPreference = 'Stop'
     Write-Verbose -Message 'Running Runbook: Get-VMKVPValue'
     Write-Verbose -Message "HyperVHost: $HyperVHost"
     Write-Verbose -Message "HyperVCred: $($HyperVCred.UserName)"
@@ -55,13 +54,21 @@
                         }
             } # function Get-KVPValue
 
-            while (($V = Get-KVPValue -CimSession $CimSession -VMName $using:VMName -Key $using:Key) -ne $using:Value) {
-                Start-Sleep -Seconds 5
+            if ($using:Value) {
+                while (($V = Get-KVPValue -CimSession $CimSession -VMName $using:VMName -Key $using:Key) -ne $using:Value) {
+                    Start-Sleep -Seconds 5
+                }
             }
+            else {
+                while (($V = Get-KVPValue -CimSession $CimSession -VMName $using:VMName -Key $using:Key) -eq $null) {
+                    Start-Sleep -Seconds 5
+                }
+            }
+            $v | Out-String | Write-Verbose
             Write-Output -InputObject $V
             $CimSession | Remove-CimSession
 
-        } -PSComputerName $HyperVHost -PSCredential $HyperVCred
+        }
         Add-Member -InputObject $OutputObj -MemberType NoteProperty -Name 'VMName' -Value $VMName
         Add-Member -InputObject $OutputObj -MemberType NoteProperty -Name 'Key' -Value $Key
         Add-Member -InputObject $OutputObj -MemberType NoteProperty -Name 'Value' -Value $Result

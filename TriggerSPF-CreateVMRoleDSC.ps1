@@ -56,11 +56,21 @@
     }
 
     foreach ($VM in $VMRoleVMs.VMs) {
+        $InstallSource = Wait-VMKVPValue -HyperVHost $VM.VMHost -HyperVCred $VMMCreds -VMName $VM.Name -Key 'InstallDisk'
+        if ($InstallSource.error) {
+            Write-Error -Message "Error occured while running Wait-VMKVPValue runbook for $VM.name - $($KVP.error)" -ErrorAction Continue
+        }
+        $InstallSource | Out-String
+
+        if ($InstallSource.Value -ne 'None') {
+            Add-InstallSourceDisk -HyperVHost $VM.VMHost -HyperVCred $VMMCreds -VMName $VM.Name -InstallDisk $InstallSource.Value
+        }
+
         $KVP = Wait-VMKVPValue -HyperVHost $VM.VMHost -HyperVCred $VMMCreds -VMName $VM.Name -Key 'LCMStatus' -Value 'Finished'
         if ($KVP.error) {
             Write-Error -Message "Error occured while running Wait-VMKVPValue runbook for $VM.name - $($KVP.error)" -ErrorAction Continue
         }
-        Write-Output -InputObject $KVP
+        $KVP | Out-String
     }
 
     SendMail -Body "<h1>Time to check on WAPack!</h1><br>

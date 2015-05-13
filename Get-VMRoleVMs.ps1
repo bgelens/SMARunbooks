@@ -1,4 +1,5 @@
 ﻿workflow Get-VMRoleVMs {
+
     [OutputType([PSCustomObject])]
 
     param (
@@ -14,7 +15,6 @@
 
     $OutputObj = [PSCustomObject] @{}
 
-    $ErrorActionPreference = 'Stop'
     Write-Verbose -Message 'Running Runbook: Get-VMRoleVMs'
     Write-Verbose -Message "VMRoleId: $VMRoleId"
     Write-Verbose -Message "VMMServer: $VMMServer"

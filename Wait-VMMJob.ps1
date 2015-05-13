@@ -1,4 +1,5 @@
 ﻿workflow Wait-VMMJob {
+
     [OutputType([PSCustomObject])]
 
     param (
@@ -14,7 +15,6 @@
 
     $OutputObj = [PSCustomObject] @{}
 
-    $ErrorActionPreference = 'Stop'
     Write-Verbose -Message 'Running Runbook: Wait-VMMJob'
     Write-Verbose -Message "VMMJobId: $VMMJobId"
     Write-Verbose -Message "VMMServer: $VMMServer"
