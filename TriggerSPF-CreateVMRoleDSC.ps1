@@ -38,16 +38,14 @@
         return
     }
 
-    SendMail -Body '<h1>Time to check on WAPack!</h1>' `
-             -Subject 'SMA Update - Enabling Provisioning Status in 120 seconds' `
-             -To 'ben.gelens@inovativ.nl'
-
-    Start-Sleep -Seconds 120
-
     $ProvisioningEnable = Set-CloudServiceStatus -VMRoleID $ResourceObject.id `
                                                  -VMMServer $VMMServer `
                                                  -VMMCreds $VMMCreds `
                                                  -Provisioning $true
+
+    SendMail -Body '<h1>Time to check on WAPack!</h1>' `
+             -Subject 'SMA Update - Enabling Provisioning Status show VMM Job!' `
+             -To 'ben.gelens@inovativ.nl'
     
     Write-Output -InputObject $ProvisioningEnable
 
@@ -66,8 +64,8 @@
     }
 
     SendMail -Body "<h1>Time to check on WAPack!</h1><br>
-                    Key: $KVP.Key<br>
-                    Value: $KVP.Value" `
+                    Key: $($KVP.Key)<br>
+                    Value: $($KVP.Value)" `
              -Subject 'SMA Update - Disabling Provisioning Status in 120 seconds' `
              -To 'ben.gelens@inovativ.nl'
 
