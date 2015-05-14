@@ -63,19 +63,29 @@
         $InstallSource | Out-String
 
         if ($InstallSource.Value -ne 'None') {
-            Add-InstallSourceDisk -HyperVHost $VM.VMHost -HyperVCred $VMMCreds -VMName $VM.Name -InstallDisk $InstallSource.Value
+            $SourceDisk = Add-InstallSourceDisk -HyperVHost $VM.VMHost -HyperVCred $VMMCreds -VMName $VM.Name -InstallDisk $InstallSource.Value
+
+            $SourceDisk | Out-String
+
+            if ($SourceDisk.error -or -not $SourceDisk.Exist -or -not $SourceDisk.Attached) {
+                Write-Error -Message "Error occured while attaching install source $($InstallSource.Value)" -ErrorAction Continue
+                $SkipWaitForLCM = $true
+            }
         }
 
-        $KVP = Wait-VMKVPValue -HyperVHost $VM.VMHost -HyperVCred $VMMCreds -VMName $VM.Name -Key 'LCMStatus' -Value 'Finished'
-        if ($KVP.error) {
-            Write-Error -Message "Error occured while running Wait-VMKVPValue runbook for $VM.name - $($KVP.error)" -ErrorAction Continue
+        if (-not $SkipWaitForLCM) {
+            $KVP = Wait-VMKVPValue -HyperVHost $VM.VMHost -HyperVCred $VMMCreds -VMName $VM.Name -Key 'LCMStatus' -Value 'Finished'
+            if ($KVP.error) {
+                Write-Error -Message "Error occured while running Wait-VMKVPValue runbook for $VM.name - $($KVP.error)" -ErrorAction Continue
+            }
+            $KVP | Out-String
         }
-        $KVP | Out-String
     }
 
     SendMail -Body "<h1>Time to check on WAPack!</h1><br>
                     Key: $($KVP.Key)<br>
-                    Value: $($KVP.Value)" `
+                    Value: $($KVP.Value)<br>
+                    InstallDisk: $($InstallSource.Value)" `
              -Subject 'SMA Update - Disabling Provisioning Status in 120 seconds' `
              -To 'ben.gelens@inovativ.nl'
 

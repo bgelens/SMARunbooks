@@ -30,7 +30,7 @@
 
             #Wait until VMs are present in cloudresource or until 3 minutes have passed
             $i = 0
-            while (!((Get-CloudResource -Id $using:VMRoleId).VMs) -and $i -lt 36) {
+            while (!((Get-CloudResource -Id $using:VMRoleId).VMs) -or $i -ne 36) {
                 $i++
                 Write-Debug 'Wait for VMs to be added to cloudresource'
                 Start-Sleep -Seconds 5

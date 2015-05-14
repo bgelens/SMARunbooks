@@ -34,7 +34,7 @@
                 Write-Debug -Message 'Waiting for job to stop Running, sleeping for 3 seconds'
                 Start-Sleep -Seconds 3
             }
-            $status = [String](Get-SCJob -ID $using:VMMJobId).Status
+            $status = [String](Get-SCJob -ID $using:VMMJobId).StatusString
             return $status
         } -PSComputerName $VMMServer -PSCredential $VMMCreds -PSRequiredModules VirtualMachineManager
         Add-Member -InputObject $OutputObj -MemberType NoteProperty -Name 'Status' -Value $Result
