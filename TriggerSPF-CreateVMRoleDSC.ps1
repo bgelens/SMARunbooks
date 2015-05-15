@@ -59,6 +59,7 @@
         $InstallSource = Wait-VMKVPValue -HyperVHost $VM.VMHost -HyperVCred $VMMCreds -VMName $VM.Name -Key 'InstallDisk'
         if ($InstallSource.error) {
             Write-Error -Message "Error occured while running Wait-VMKVPValue runbook for $VM.name - $($KVP.error)" -ErrorAction Continue
+            $SkipWaitForLCM = $true
             $Failed = $true
         }
         $InstallSource | Out-String
@@ -78,7 +79,7 @@
         if (-not $SkipWaitForLCM) {
             $KVP = Wait-VMKVPValue -HyperVHost $VM.VMHost -HyperVCred $VMMCreds -VMName $VM.Name -Key 'LCMStatus' -Value 'Finished'
             if ($KVP.error) {
-                Write-Error -Message "Error occured while running Wait-VMKVPValue runbook for $VM.name - $($KVP.error)" -ErrorAction Continue
+                Write-Error -Message "Error occured while running Wait-VMKVPValue runbook for $($VM.name) - $($KVP.error)" -ErrorAction Continue
                 $Failed = $true
             }
             $KVP | Out-String
