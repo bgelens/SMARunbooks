@@ -54,14 +54,16 @@
                         }
             } # function Get-KVPValue
 
+            #Timeout of 360 * 5 = 1800 /60 = 30 Minutes
+            [int]$timeout = 0
             if ($using:Value) {
-                while (($V = Get-KVPValue -CimSession $CimSession -VMName $using:VMName -Key $using:Key) -ne $using:Value) {
+                while (($V = Get-KVPValue -CimSession $CimSession -VMName $using:VMName -Key $using:Key) -ne $using:Value -and $timeout -ne 360) {
+                    $timeout++
                     Start-Sleep -Seconds 5
                 }
             }
             else {
-                #Timeout of 360 * 5 = 1800 /60 = 30 Minutes
-                [int]$timeout = 0
+                
                 while (($V = Get-KVPValue -CimSession $CimSession -VMName $using:VMName -Key $using:Key) -eq $null -and $timeout -ne 360) {
                     $timeout++
                     Start-Sleep -Seconds 5
