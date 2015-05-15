@@ -59,10 +59,11 @@
         $InstallSource = Wait-VMKVPValue -HyperVHost $VM.VMHost -HyperVCred $VMMCreds -VMName $VM.Name -Key 'InstallDisk'
         if ($InstallSource.error) {
             Write-Error -Message "Error occured while running Wait-VMKVPValue runbook for $VM.name - $($KVP.error)" -ErrorAction Continue
+            $Failed = $true
         }
         $InstallSource | Out-String
 
-        if ($InstallSource.Value -ne 'None') {
+        if ($InstallSource.Value -ne 'None' -and $InstallSource.Value -ne $null) {
             $SourceDisk = Add-InstallSourceDisk -HyperVHost $VM.VMHost -HyperVCred $VMMCreds -VMName $VM.Name -InstallDisk $InstallSource.Value
 
             $SourceDisk | Out-String
@@ -70,6 +71,7 @@
             if ($SourceDisk.error -or -not $SourceDisk.Exist -or -not $SourceDisk.Attached) {
                 Write-Error -Message "Error occured while attaching install source $($InstallSource.Value)" -ErrorAction Continue
                 $SkipWaitForLCM = $true
+                $Failed = $true
             }
         }
 
@@ -77,6 +79,7 @@
             $KVP = Wait-VMKVPValue -HyperVHost $VM.VMHost -HyperVCred $VMMCreds -VMName $VM.Name -Key 'LCMStatus' -Value 'Finished'
             if ($KVP.error) {
                 Write-Error -Message "Error occured while running Wait-VMKVPValue runbook for $VM.name - $($KVP.error)" -ErrorAction Continue
+                $Failed = $true
             }
             $KVP | Out-String
         }
@@ -91,11 +94,20 @@
 
     Start-Sleep -Seconds 120
 
-    $ProvisioningDisable = Set-CloudServiceStatus -VMRoleID $ResourceObject.id `
-                                                  -VMMServer $VMMServer `
-                                                  -VMMCreds $VMMCreds `
-                                                  -Provisioned $true `
-                                                  -ServiceInstanceId $ProvisioningEnable.ServiceInstanceId
+    if ($failed) {
+        $ProvisioningDisable = Set-CloudServiceStatus -VMRoleID $ResourceObject.id `
+                                                      -VMMServer $VMMServer `
+                                                      -VMMCreds $VMMCreds `
+                                                      -Failed $true `
+                                                      -ServiceInstanceId $ProvisioningEnable.ServiceInstanceId
+    }
+    else {
+        $ProvisioningDisable = Set-CloudServiceStatus -VMRoleID $ResourceObject.id `
+                                                      -VMMServer $VMMServer `
+                                                      -VMMCreds $VMMCreds `
+                                                      -Provisioned $true `
+                                                      -ServiceInstanceId $ProvisioningEnable.ServiceInstanceId
+    }
     
     Write-Output -InputObject $ProvisioningDisable
 

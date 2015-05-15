@@ -16,10 +16,10 @@
 
         [bool] $Provisioning,
 
-        [bool] $Provisioned
-    )
+        [bool] $Provisioned,
 
-    $OutputObj = [PSCustomObject] @{}
+        [bool] $Failed
+    )
 
     Write-Verbose -Message 'Running Runbook: Set-CloudServiceStatus'
     Write-Verbose -Message "VMRoleID: $VMRoleID"
@@ -27,6 +27,10 @@
     Write-Verbose -Message "VMMCreds: $($VMMCreds.UserName)"
     Write-Verbose -Message "Provisioning: $Provisioning"
     Write-Verbose -Message "Provisioned: $Provisioned"
+    Write-Verbose -Message "Failed: $Failed"
+
+    $OutputObj = [PSCustomObject] @{}
+
     if ($ServiceInstanceId) {
         Write-Verbose -Message "ServiceInstanceId: $ServiceInstanceId"
     }
@@ -37,10 +41,20 @@
             throw 'Cannot state Provisioned and Provisioning at the same time'
         }
 
-        if ($Provisioned) {
+        if ($Provisioned -and $Failed) {
+            Write-Error -Message 'Cannot state Provisioned and Failed at the same time' -ErrorAction Continue
+            throw 'Cannot state Provisioned and Failed at the same time'
+        }
+
+        if ($Provisioning -and $Failed) {
+            Write-Error -Message 'Cannot state Provisioning and Failed at the same time' -ErrorAction Continue
+            throw 'Cannot state Provisioning and Failed at the same time'
+        }
+
+        if ($Provisioned -or $Failed) {
             if (-not $ServiceInstanceId) {
-                Write-Error -Message 'ServiceInstanceId not present, cannot update table to provisioned state' -ErrorAction Continue
-                throw 'ServiceInstanceId not present, cannot update table to provisioned state'
+                Write-Error -Message 'ServiceInstanceId not present, cannot update table to provisioned or failed state' -ErrorAction Continue
+                throw 'ServiceInstanceId not present, cannot update table to provisioned or failed state'
             }
         }
         Add-Member -InputObject $OutputObj -MemberType NoteProperty -Name 'VMRoleID' -Value $VMRoleID
@@ -121,7 +135,7 @@
                 $TSQL = @"
                 update dbo.tbl_WLC_ServiceInstance
                 Set ObjectState = 1, VMRoleID = '$using:VMRoleID'
-                where ServiceInstanceId = '$using:ServiceInstanceId'
+               where ServiceInstanceId = '$using:ServiceInstanceId'
 "@
                 $command = New-Object -TypeName System.Data.SqlClient.SqlCommand
                 $command.Connection = $conn
@@ -131,7 +145,20 @@
                 Add-Member -InputObject $InlineObj -MemberType NoteProperty -Name 'ServiceInstanceId' -Value $using:ServiceInstanceId
             }
 
-            #elseif ($using:Failed) {} ?
+            elseif ($using:Failed) {
+                Write-Verbose -Message 'Enable Fail status'
+                $TSQL = @"
+                update dbo.tbl_WLC_ServiceInstance
+                Set ObjectState = 3, VMRoleID = '$using:VMRoleID'
+                where ServiceInstanceId = '$using:ServiceInstanceId'
+"@
+                $command = New-Object -TypeName System.Data.SqlClient.SqlCommand
+                $command.Connection = $conn
+                $command.CommandText = $TSQL
+                $null = $command.ExecuteNonQuery()
+
+                Add-Member -InputObject $InlineObj -MemberType NoteProperty -Name 'ServiceInstanceId' -Value $using:ServiceInstanceId
+            }
            
             $conn.Close()
             $conn.Dispose()
@@ -141,6 +168,7 @@
         } -PSComputerName $ActiveNode.VMMServer -PSCredential $VMMCreds -PSRequiredModules VirtualMachineManager -PSAuthentication CredSSP
     }
     catch {
+        Write-Error -Message "Exception happened in runbook Set-CloudServiceStatus: $($_.Message)" -ErrorAction Continue
         Add-Member -InputObject $OutputObj -MemberType NoteProperty -Name 'error' -Value $_.message
     }
 

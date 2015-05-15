@@ -60,8 +60,14 @@
                 }
             }
             else {
-                while (($V = Get-KVPValue -CimSession $CimSession -VMName $using:VMName -Key $using:Key) -eq $null) {
+                #Timeout of 360 * 5 = 1800 /60 = 30 Minutes
+                [int]$timeout = 0
+                while (($V = Get-KVPValue -CimSession $CimSession -VMName $using:VMName -Key $using:Key) -eq $null -and $timeout -ne 360) {
+                    $timeout++
                     Start-Sleep -Seconds 5
+                }
+                if ($V -eq $null) {
+                    throw 'No Value appeared within 30 minutes'
                 }
             }
             $v | Out-String | Write-Verbose
