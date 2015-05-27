@@ -78,7 +78,7 @@
 
         if (-not $SkipWaitForLCM) {
             $KVP = Wait-VMKVPValue -HyperVHost $VM.VMHost -HyperVCred $VMMCreds -VMName $VM.Name -Key 'LCMStatus' -Value 'Finished'
-            if ($KVP.error) {
+            if ($KVP.error -or $KVP.Value -eq $null) {
                 Write-Error -Message "Error occured while running Wait-VMKVPValue runbook for $($VM.name) - $($KVP.error)" -ErrorAction Continue
                 $Failed = $true
             }
